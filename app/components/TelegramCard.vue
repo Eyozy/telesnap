@@ -70,7 +70,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import DOMPurify from 'isomorphic-dompurify'
+import DOMPurify from 'dompurify'
 import type { MessageData, Gradient } from '~/types'
 import { ALLOWED_HTML_TAGS, ALLOWED_HTML_ATTRS } from '~/constants'
 
@@ -126,6 +126,12 @@ function linkifyUrls(text: string): string {
 
 const sanitizedContent = computed(() => {
   if (!props.message?.content) return ''
+  
+  // DOMPurify only works in browser, skip sanitization during SSR
+  // The component will re-render on client with proper sanitization
+  if (!import.meta.client) {
+    return props.message.content
+  }
   
   // First sanitize the HTML
   let content = DOMPurify.sanitize(props.message.content, {
