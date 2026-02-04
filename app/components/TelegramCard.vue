@@ -162,6 +162,9 @@ const sanitizedContent = computed(() => {
   
   return content
 })
+
+// Expose $el for parent components to access root element
+defineExpose({})
 </script>
 
 <style scoped>

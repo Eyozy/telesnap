@@ -183,9 +183,9 @@ async function fetchMessage() {
   }
 }
 
-function handleDownload() {
+async function handleDownload() {
   const element = messageCard.value?.$el || messageCard.value
-  downloadImage(element as HTMLElement)
+  await downloadImage(element as HTMLElement)
   if (genError.value) {
     setError(genError.value)
   }
