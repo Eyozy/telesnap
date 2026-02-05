@@ -35,9 +35,13 @@ export function useImageGenerator() {
             clone.style.width = '672px' // 42rem fixed width
             clone.style.maxWidth = 'none'
 
-            // Style for clean export: background no radius, card keeps radius
+            // Export styling: background no radius; card has radius only when background exists
             const bgDiv = clone.querySelector(':scope > div:first-child') as HTMLElement | null
+            const hasBackground = bgDiv && bgDiv.style.background && bgDiv.style.background !== 'transparent'
+            const whiteCard = clone.querySelector('.bg-white') as HTMLElement | null
+
             if (bgDiv) bgDiv.style.borderRadius = '0'
+            if (whiteCard && !hasBackground) whiteCard.style.borderRadius = '0'
 
             // Show full URL (remove truncation)
             const linkSpan = clone.querySelector('.truncate')

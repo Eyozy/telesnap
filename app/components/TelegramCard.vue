@@ -9,9 +9,8 @@
 
     <!-- Card content -->
     <div class="relative z-10">
-      <div 
-        class="bg-white shadow-xl overflow-hidden" 
-        :class="{ 'rounded-2xl': true, 'w-[42rem] max-w-full': true }"
+      <div
+        class="bg-white shadow-xl overflow-hidden w-[42rem] max-w-full rounded-2xl"
       >
         <div class="px-6 pt-6 pb-4">
           <!-- Author section -->
