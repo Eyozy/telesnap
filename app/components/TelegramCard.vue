@@ -33,6 +33,20 @@
             <div class="flex-1 min-w-0">
               <div class="font-semibold text-slate-900 text-base">{{ message.author || 'Unknown' }}</div>
               <div v-if="message.username" class="text-blue-600 text-sm">@{{ message.username }}</div>
+              <!-- Forwarded source indicator -->
+              <div v-if="message.forwardedFrom" class="text-slate-500 text-xs mt-1 flex items-center gap-1">
+                <span>↪</span>
+                <span>Forwarded from</span>
+                <a
+                  v-if="message.forwardedFrom.url"
+                  :href="message.forwardedFrom.url"
+                  class="text-blue-600 hover:underline"
+                  style="color: #2563eb;"
+                  target="_blank"
+                  rel="noopener"
+                >{{ message.forwardedFrom.name }}</a>
+                <span v-else>{{ message.forwardedFrom.name }}</span>
+              </div>
             </div>
           </div>
 

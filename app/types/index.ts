@@ -9,6 +9,10 @@ export interface MessageData {
     views: number | null
     isoTimestamp: string | null
     media?: string | null
+    forwardedFrom?: {
+        name: string
+        url: string | null
+    } | null
 }
 
 /** Background gradient option */

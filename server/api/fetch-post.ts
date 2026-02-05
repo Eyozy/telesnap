@@ -10,6 +10,10 @@ interface TelegramMessage {
   isoTimestamp: string | null
   views: number | null
   media: string | null
+  forwardedFrom: {
+    name: string
+    url: string | null
+  } | null
 }
 
 /** Telegram URL validation regex - supports both channel and group formats */
@@ -279,6 +283,18 @@ function parseTelegramPage(html: string, channelName: string, messageId: string)
     }
   }
 
+  // Extract forwarded from info
+  const forwardedEl = searchScope.querySelector('.tgme_widget_message_forwarded_from')
+  let forwardedFrom: TelegramMessage['forwardedFrom'] = null
+  if (forwardedEl) {
+    const nameEl = forwardedEl.querySelector('.tgme_widget_message_forwarded_from_name')
+    const name = nameEl?.textContent?.trim() || ''
+    const url = nameEl?.getAttribute('href') || null
+    if (name) {
+      forwardedFrom = { name, url }
+    }
+  }
+
   return {
     author,
     username: channelName,
@@ -286,7 +302,8 @@ function parseTelegramPage(html: string, channelName: string, messageId: string)
     content: content.trim(),
     isoTimestamp,
     views,
-    media: postImage
+    media: postImage,
+    forwardedFrom
   }
 }
 
