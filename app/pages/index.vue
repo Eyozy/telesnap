@@ -71,7 +71,6 @@
                 :message="messageData"
                 :url="cardUrl"
                 :gradient="selectedGradient"
-                :padding="cardPadding"
                 :hide-link="hidePostLink"
                 :formatted-time="formattedTimestamp"
               />
@@ -104,10 +103,8 @@
             <CustomizePanel
               :gradients="GRADIENTS"
               :selected-gradient="selectedGradient"
-              :padding="cardPadding"
               :hide-link="hidePostLink"
               @update:gradient="selectedGradient = $event"
-              @update:padding="cardPadding = $event"
               @update:hide-link="hidePostLink = $event"
             />
           </div>
@@ -148,7 +145,6 @@ const formattedTimestamp = ref('')
 
 // Customization state
 const selectedGradient = ref<Gradient>(GRADIENTS[0])
-const cardPadding = ref(DEFAULT_PADDING)
 const hidePostLink = ref(false)
 
 // Template ref

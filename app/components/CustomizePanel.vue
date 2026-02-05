@@ -20,53 +20,6 @@
       </div>
     </div>
 
-    <!-- Padding slider (only when background selected) -->
-    <Transition
-      enter-active-class="transition-all duration-300 ease-out"
-      leave-active-class="transition-all duration-200 ease-in"
-      enter-from-class="opacity-0 max-h-0 overflow-hidden"
-      enter-to-class="opacity-100 max-h-32"
-      leave-from-class="opacity-100 max-h-32"
-      leave-to-class="opacity-0 max-h-0 overflow-hidden"
-    >
-      <div v-if="selectedGradient.name !== 'none'" class="mb-6">
-        <div class="flex items-center justify-between mb-3">
-          <label class="text-sm font-semibold text-slate-700">Spacing</label>
-          <Transition
-            enter-active-class="transition-opacity duration-200"
-            leave-active-class="transition-opacity duration-150"
-            enter-from-class="opacity-0"
-            enter-to-class="opacity-100"
-            leave-from-class="opacity-100"
-            leave-to-class="opacity-0"
-          >
-            <button
-              v-if="padding !== defaultPadding"
-              @click="emit('update:padding', defaultPadding)"
-              class="text-xs text-slate-500 hover:text-blue-500 transition-colors cursor-pointer flex items-center gap-1"
-            >
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-              </svg>
-              Reset
-            </button>
-          </Transition>
-        </div>
-        <input
-          :value="padding"
-          @input="emit('update:padding', Number(($event.target as HTMLInputElement).value))"
-          type="range"
-          min="20"
-          max="80"
-          class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-        />
-        <div class="flex justify-between text-xs text-slate-500 mt-2">
-          <span>Compact</span>
-          <span>Spacious</span>
-        </div>
-      </div>
-    </Transition>
-
     <!-- Hide post link toggle -->
     <div class="mb-4">
       <div class="flex items-center justify-between mb-2">
@@ -95,25 +48,19 @@
 
 <script setup lang="ts">
 import type { Gradient } from '~/types'
-import { DEFAULT_PADDING } from '~/constants'
 
 interface Props {
   gradients: Gradient[]
   selectedGradient: Gradient
-  padding?: number
   hideLink?: boolean
 }
 
 withDefaults(defineProps<Props>(), {
-  padding: DEFAULT_PADDING,
   hideLink: false
 })
 
-const defaultPadding = DEFAULT_PADDING
-
 const emit = defineEmits<{
   'update:gradient': [gradient: Gradient]
-  'update:padding': [padding: number]
   'update:hideLink': [hideLink: boolean]
 }>()
 </script>
@@ -126,16 +73,5 @@ const emit = defineEmits<{
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
-}
-
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #3b82f6;
-  cursor: pointer;
-  border: 3px solid white;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 </style>

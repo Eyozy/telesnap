@@ -1,10 +1,9 @@
 <template>
   <div class="message-card relative" :class="cardClasses" :style="containerStyle">
     <!-- Background gradient -->
-    <div 
-      v-if="gradient.name !== 'none'" 
-      class="absolute inset-0" 
-      :class="{ 'rounded-3xl': gradient.name !== 'none' }" 
+    <div
+      v-if="gradient.name !== 'none'"
+      class="absolute inset-0"
       :style="{ background: gradient.style }"
     />
 
@@ -95,13 +94,11 @@ interface Props {
   message: MessageData
   url: string
   gradient: Gradient
-  padding?: number
   hideLink?: boolean
   formattedTime?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  padding: 32,
   hideLink: false,
   formattedTime: ''
 })
@@ -112,7 +109,7 @@ watch(() => props.message.avatar, () => {
 })
 
 const containerStyle = computed(() => ({
-  padding: props.gradient.name !== 'none' ? `${props.padding}px` : '0'
+  padding: props.gradient.name !== 'none' ? '32px' : '0'
 }))
 
 const cardClasses = computed(() => ({
