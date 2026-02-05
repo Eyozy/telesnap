@@ -19,12 +19,26 @@
         <!-- URL Input -->
         <div class="max-w-2xl mx-auto mb-8 md:mb-12">
           <div class="flex flex-col sm:flex-row gap-3">
-            <input
-              v-model="messageUrl"
-              type="text"
-              :placeholder="`${DEFAULT_TELEGRAM_URL}`"
-              class="flex-1 px-5 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 outline-none transition-all text-slate-800 placeholder-slate-400"
-            />
+            <div class="relative flex-1">
+              <input
+                v-model="messageUrl"
+                type="text"
+                :placeholder="`${DEFAULT_TELEGRAM_URL}`"
+                class="w-full px-5 py-3 pr-10 rounded-xl border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 outline-none transition-all text-slate-800 placeholder-slate-400"
+              />
+              <!-- Clear button -->
+              <button
+                v-if="messageUrl"
+                @click="messageUrl = ''"
+                type="button"
+                class="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                aria-label="Clear input"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
             <button
               @click="fetchMessage"
               :disabled="loading"

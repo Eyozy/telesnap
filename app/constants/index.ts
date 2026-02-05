@@ -33,8 +33,10 @@ export const RATE_LIMIT = {
     WINDOW_MS: 60_000
 } as const
 
-// Telegram URL validation regex
-export const TELEGRAM_URL_REGEX = /^https?:\/\/(t\.me|telegram\.me)\/([a-zA-Z0-9_]+)\/(\d+)$/
+// Telegram URL validation regex - supports both channel and group formats
+// Channel: https://t.me/channel/123
+// Group:   https://t.me/c/1234567890/123
+export const TELEGRAM_URL_REGEX = /^https?:\/\/(t\.me|telegram\.me)\/(c\/\d+|[a-zA-Z0-9_]+)\/(\d+)$/
 
 // DOMPurify allowed tags for XSS protection
 export const ALLOWED_HTML_TAGS = ['a', 'b', 'i', 'strong', 'em', 'u', 's', 'pre', 'code', 'br', 'span']

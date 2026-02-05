@@ -14,7 +14,7 @@
         class="bg-white shadow-xl overflow-hidden" 
         :class="{ 'rounded-2xl': true, 'w-[42rem] max-w-full': true }"
       >
-        <div class="p-6">
+        <div class="px-6 pt-6 pb-4">
           <!-- Author section -->
           <div class="flex items-start gap-4 mb-4">
             <div class="flex-shrink-0">
@@ -49,7 +49,7 @@
         </div>
 
         <!-- Footer -->
-        <div class="px-6 pb-6 pt-5 bg-white border-t border-slate-100">
+        <div class="px-6 pb-6 pt-4 bg-white border-t border-slate-100">
           <div class="flex items-center justify-between text-xs text-slate-500">
             <Transition name="slide-fade" mode="out-in">
               <div v-if="!hideLink" key="link" class="flex items-center gap-2 flex-1 min-w-0">

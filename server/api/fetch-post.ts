@@ -12,14 +12,49 @@ interface TelegramMessage {
   media: string | null
 }
 
-/** Telegram URL validation regex */
-const TELEGRAM_URL_REGEX = /^https?:\/\/(t\.me|telegram\.me)\/([a-zA-Z0-9_]+)\/(\d+)$/
+/** Telegram URL validation regex - supports both channel and group formats */
+// Channel: https://t.me/channel/123
+// Group:   https://t.me/c/1234567890/123
+const TELEGRAM_URL_REGEX = /^https?:\/\/(t\.me|telegram\.me)\/(c\/\d+|[a-zA-Z0-9_]+)\/(\d+)$/
 
 /** Allowed Telegram domains for SSRF protection */
 const ALLOWED_HOSTS = ['t.me', 'telegram.me']
 
 /** Request timeout in milliseconds */
 const FETCH_TIMEOUT_MS = 10_000
+
+/** Image fetch timeout (shorter for non-critical assets) */
+const IMAGE_FETCH_TIMEOUT_MS = 5_000
+
+/**
+ * Converts an image URL to base64 data URL.
+ * Returns null if fetch fails (non-blocking for main content).
+ */
+async function imageToBase64(url: string): Promise<string | null> {
+  if (!url) return null
+
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), IMAGE_FETCH_TIMEOUT_MS)
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+    })
+    clearTimeout(timeoutId)
+
+    if (!response.ok) return null
+
+    const arrayBuffer = await response.arrayBuffer()
+    const contentType = response.headers.get('content-type') || 'image/jpeg'
+    const base64 = Buffer.from(arrayBuffer).toString('base64')
+
+    return `data:${contentType};base64,${base64}`
+  } catch {
+    // Silently fail - avatar is not critical
+    return null
+  }
+}
 
 /** Cache settings */
 const CACHE_MAX_AGE = 300 // 5 minutes
@@ -66,7 +101,7 @@ export default defineCachedEventHandler(async (event) => {
   if (!match) {
     throw createError({
       statusCode: 400,
-      message: 'Invalid Telegram link format. Example: https://t.me/channel/123'
+      message: 'Invalid Telegram link format. Examples: https://t.me/channel/123 or https://t.me/c/1234567890/123'
     })
   }
 
@@ -81,36 +116,25 @@ export default defineCachedEventHandler(async (event) => {
   const [, , channelName, messageId] = match
 
   try {
-    // Use static page version (/s/) to get message with datetime attribute
+    // First try static page (/s/) for channels
     const staticUrl = `https://t.me/s/${channelName}/${messageId}`
+    let messageData = await fetchAndParse(staticUrl, channelName, messageId)
 
-    // Create abort controller for timeout
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
-
-    let response: Response
-    try {
-      response = await fetch(staticUrl, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'text/html',
-          'Accept-Language': 'en-US,en;q=0.5',
-        }
-      })
-    } finally {
-      clearTimeout(timeoutId)
+    // If no avatar found (group messages), try embed endpoint for user avatar
+    if (!messageData.avatar) {
+      const embedUrl = `https://t.me/${channelName}/${messageId}?embed=1&mode=tme`
+      const embedData = await fetchAndParse(embedUrl, channelName, messageId)
+      // Merge: prefer embed data for avatar and content if missing
+      messageData.avatar = embedData.avatar
+      if (!messageData.content) {
+        messageData.content = embedData.content
+      }
     }
 
-    if (!response.ok) {
-      throw createError({
-        statusCode: 404,
-        message: 'Cannot access this message. Please ensure the link is correct and the channel is public.'
-      })
+    // Convert avatar to base64 to avoid CORS issues during image export
+    if (messageData.avatar) {
+      messageData.avatar = await imageToBase64(messageData.avatar)
     }
-
-    const html = await response.text()
-    const messageData = parseTelegramPage(html, channelName, messageId)
 
     return messageData
 
@@ -134,6 +158,38 @@ export default defineCachedEventHandler(async (event) => {
     return `telegram:${body?.url || 'unknown'}`
   }
 })
+
+/**
+ * Fetches and parses a Telegram page URL.
+ */
+async function fetchAndParse(url: string, channelName: string, messageId: string): Promise<TelegramMessage> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+
+  let response: Response
+  try {
+    response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html',
+        'Accept-Language': 'en-US,en;q=0.5',
+      }
+    })
+  } finally {
+    clearTimeout(timeoutId)
+  }
+
+  if (!response.ok) {
+    throw createError({
+      statusCode: 404,
+      message: 'Cannot access this message. Please ensure the link is correct and the channel is public.'
+    })
+  }
+
+  const html = await response.text()
+  return parseTelegramPage(html, channelName, messageId)
+}
 
 /**
  * Parses Telegram HTML page using DOM parser.
@@ -161,16 +217,28 @@ function parseTelegramPage(html: string, channelName: string, messageId: string)
   const contentEl = searchScope.querySelector('.tgme_widget_message_text')
   let content = contentEl?.innerHTML || ''
 
-  // Clean content: convert <br> to newlines, strip unwanted tags
+  // Clean content: convert <br> to newlines, clean emoji tags, strip unwanted tags
   content = content
     .replace(/<br\s*\/?>/gi, '\n')
+    // Clean Telegram emoji <i> tags: extract emoji from nested <b> tag
+    // Format: <i class="emoji" style="..."><b>👍</b></i> -> 👍
+    .replace(/<i[^>]*class="[^"]*emoji[^"]*"[^>]*>(?:<b>)?([^<]*)(?:<\/b>)?<\/i>/gi, '$1')
     .replace(/<(?!\/?(?:a|b|i|strong|em|u|s|pre|code|span)\b)[^>]+>/gi, '')
     .trim()
   content = decodeHtmlEntities(content)
 
-  // Extract avatar
-  const avatarEl = searchScope.querySelector('.tgme_widget_message_user_photo img')
-  const avatar = avatarEl?.getAttribute('src') || null
+  // Fallback to og:description for group messages (no static page available)
+  if (!content) {
+    const ogDescription = document.querySelector('meta[property="og:description"]')?.getAttribute('content') || ''
+    content = decodeHtmlEntities(ogDescription)
+  }
+
+  // Extract avatar - try multiple selectors for different page structures
+  // Static page: avatar is inside message block
+  // Embed page: avatar is a sibling of message bubble, use messageBlock directly
+  let avatar = messageBlock?.querySelector('.tgme_widget_message_user_photo img')?.getAttribute('src')
+    || searchScope.querySelector('.tgme_widget_message_user_photo img')?.getAttribute('src')
+    || null
 
   // Extract post image from background-image style
   const photoWrap = searchScope.querySelector('.tgme_widget_message_photo_wrap')
