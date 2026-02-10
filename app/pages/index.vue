@@ -153,6 +153,8 @@ const messageCard = ref<{ $el: HTMLElement } | null>(null)
 // Format timestamp on client side only
 onMounted(() => {
   updateTimestamp()
+  // Fetch demo message with real avatar on mount
+  fetchDemoMessage()
 })
 
 function updateTimestamp() {
@@ -198,6 +200,21 @@ async function handleDownload() {
   await downloadImage(element as HTMLElement)
   if (genError.value) {
     setError(genError.value)
+  }
+}
+
+async function fetchDemoMessage() {
+  try {
+    const response = await $fetch('/api/fetch-post', {
+      method: 'POST',
+      body: { url: DEFAULT_TELEGRAM_URL }
+    })
+    messageData.value = response as MessageData
+    cardUrl.value = DEFAULT_TELEGRAM_URL
+    updateTimestamp()
+  } catch (err) {
+    // Silent fail - fallback to static DEMO_MESSAGE
+    console.log('Failed to fetch demo message, using fallback')
   }
 }
 </script>

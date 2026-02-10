@@ -50,7 +50,7 @@
 import type { Gradient } from '~/types'
 
 interface Props {
-  gradients: Gradient[]
+  gradients: readonly Gradient[]
   selectedGradient: Gradient
   hideLink?: boolean
 }

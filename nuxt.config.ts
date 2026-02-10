@@ -22,9 +22,11 @@ export default defineNuxtConfig({
         { property: 'og:title', content: 'TeleSnap - Turn Telegram Messages into Images' },
         { property: 'og:description', content: 'Turn any Telegram message into a beautiful, shareable image.' },
         { property: 'og:type', content: 'website' },
+        { property: 'og:image', content: '/og.jpg' },
         { name: 'twitter:card', content: 'summary_large_image' },
         { name: 'twitter:title', content: 'TeleSnap' },
-        { name: 'twitter:description', content: 'Turn any Telegram message into a beautiful, shareable image.' }
+        { name: 'twitter:description', content: 'Turn any Telegram message into a beautiful, shareable image.' },
+        { name: 'twitter:image', content: '/og.jpg' }
       ],
       link: [
         { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }
