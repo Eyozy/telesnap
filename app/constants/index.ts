@@ -17,7 +17,7 @@ export const GRADIENTS = [
     { name: 'none', preview: 'transparent', style: 'transparent' },
     { name: 'blue', preview: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)', style: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)' },
     { name: 'purple', preview: 'linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)', style: 'linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)' },
-    { name: 'sunset', preview: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', style: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' },
+    { name: 'sunset', preview: 'linear-gradient(135deg, #fdba74 0%, #f43f5e 100%)', style: 'linear-gradient(135deg, #fdba74 0%, #f43f5e 100%)' },
     { name: 'mint', preview: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)', style: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)' },
     { name: 'rose', preview: 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)', style: 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)' },
     { name: 'slate', preview: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)', style: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)' },

@@ -1,23 +1,25 @@
 <template>
-  <div class="bg-white rounded-3xl border-2 border-slate-200 shadow-xl p-6 h-full flex flex-col justify-between">
+  <div class="bg-white rounded-3xl border-2 border-slate-200 shadow-xl p-6 lg:h-full lg:flex lg:flex-col lg:justify-between">
 
     <!-- Header -->
     <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6">Customize</h3>
 
     <!-- Background selection -->
-    <div class="flex-1">
+    <div class="lg:flex-1">
       <label class="block text-sm font-semibold text-slate-700 mb-3">Background</label>
-      <div class="grid grid-cols-4 gap-3">
+      <div class="grid grid-cols-8 lg:grid-cols-4 gap-2 lg:gap-3">
         <button
           v-for="gradient in gradients"
           :key="gradient.name"
           @click="emit('update:gradient', gradient)"
-          class="h-14 rounded-2xl cursor-pointer ring-2 ring-offset-2 transition-all"
-          :class="selectedGradient.name === gradient.name
-            ? 'ring-blue-500'
-            : 'ring-transparent hover:ring-slate-300'"
-          :style="{ background: gradient.preview }"
+          class="w-full aspect-square lg:aspect-auto lg:h-14 rounded-xl lg:rounded-2xl cursor-pointer ring-2 ring-offset-2 transition-all shadow-sm lg:shadow-none hover:shadow-md lg:hover:shadow-none hover:-translate-y-0.5 lg:hover:translate-y-0"
+          :class="[
+            selectedGradient.name === gradient.name ? 'ring-blue-500' : 'ring-transparent hover:ring-slate-300',
+            gradient.name === 'none' ? 'bg-checkerboard' : ''
+          ]"
+          :style="gradient.name !== 'none' ? { background: gradient.preview } : {}"
           :title="gradient.name"
+          :aria-label="'Set background to ' + gradient.name"
         />
       </div>
     </div>
@@ -76,5 +78,17 @@ const emit = defineEmits<{
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+</style>
+
+<style>
+/* CSS Checkerboard Pattern for transparent background previews */
+.bg-checkerboard {
+  background-color: #ffffff !important;
+  background-image: 
+    linear-gradient(45deg, #e2e8f0 25%, transparent 25%, transparent 75%, #e2e8f0 75%, #e2e8f0),
+    linear-gradient(45deg, #e2e8f0 25%, transparent 25%, transparent 75%, #e2e8f0 75%, #e2e8f0) !important;
+  background-size: 16px 16px !important;
+  background-position: 0 0, 8px 8px !important;
 }
 </style>

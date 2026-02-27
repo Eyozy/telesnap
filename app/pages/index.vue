@@ -1,5 +1,23 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-slate-100 via-slate-50 to-blue-100">
+    <!-- Toast Notification Overlay -->
+    <div class="fixed top-0 left-0 right-0 z-[999] flex flex-col items-center pt-8 px-4 pointer-events-none transition-all duration-300">
+      <div 
+        class="toast-element flex items-center gap-3 bg-white/95 backdrop-blur-md border border-slate-100 rounded-2xl py-3 px-4 w-full max-w-sm pointer-events-auto"
+        :class="showWarningToast ? 'toast-enter' : 'toast-leave'"
+      >
+        <div class="flex-shrink-0 flex items-center justify-center text-amber-500 px-1">
+          <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+        </div>
+        <div class="flex-1 min-w-0 flex flex-col justify-center text-left">
+          <p class="text-[14px] font-medium text-slate-800 leading-tight">Cannot read private link</p>
+          <p class="text-[12px] text-slate-500 mt-0.5 whitespace-normal break-words">Please use a public Telegram message link</p>
+        </div>
+      </div>
+    </div>
+
     <!-- Header -->
     <AppHeader />
 
@@ -24,6 +42,7 @@
                 v-model="messageUrl"
                 type="text"
                 :placeholder="`${DEFAULT_TELEGRAM_URL}`"
+                aria-label="Telegram Message URL"
                 class="w-full px-5 py-3 pr-10 rounded-xl border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 outline-none transition-all text-slate-800 placeholder-slate-400"
               />
               <!-- Clear button -->
@@ -41,8 +60,8 @@
             </div>
             <button
               @click="fetchMessage"
-              :disabled="loading"
-              class="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-medium py-3 px-6 rounded-xl transition-all disabled:cursor-not-allowed shadow-lg shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/40 cursor-pointer whitespace-nowrap min-w-[120px]"
+              :disabled="loading || !messageUrl"
+              class="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-medium py-3 px-6 rounded-xl transition-all disabled:cursor-not-allowed shadow-lg hover:shadow-xl cursor-pointer whitespace-nowrap min-w-[120px]"
             >
               <Transition name="fade" mode="out-in">
                 <span v-if="loading" key="loading" class="flex items-center justify-center gap-2">
@@ -57,7 +76,7 @@
             </button>
           </div>
           <p v-if="error" class="mt-2 text-sm text-red-500">{{ error }}</p>
-          <p class="mt-2 text-xs text-slate-400 text-center">Private groups and channels are not supported</p>
+          <p class="mt-2 text-xs text-slate-500 text-center">Private groups and channels are not supported</p>
         </div>
 
         <!-- Main Grid -->
@@ -102,7 +121,7 @@
         </div>
 
         <!-- Action Buttons (outside grid, centered below both panels) -->
-        <div v-if="messageData" class="mt-6 md:mt-8">
+        <div v-if="messageData" class="mt-4 lg:mt-8">
           <ActionButtons
             :generating="generating"
             :url="cardUrl"
@@ -131,6 +150,18 @@ const error = ref('')
 const cardUrl = ref(DEFAULT_TELEGRAM_URL)
 let errorTimeout: ReturnType<typeof setTimeout> | null = null
 
+// Toast State
+const showWarningToast = ref(false)
+let toastTimeout: ReturnType<typeof setTimeout> | null = null
+
+function triggerWarningToast() {
+  if (toastTimeout) clearTimeout(toastTimeout)
+  showWarningToast.value = true
+  toastTimeout = setTimeout(() => {
+    showWarningToast.value = false
+  }, 3000)
+}
+
 // Auto-clear error after 5 seconds
 function setError(message: string) {
   if (errorTimeout) clearTimeout(errorTimeout)
@@ -156,7 +187,9 @@ const panelColRef = ref<HTMLElement | null>(null)
 watch(messageData, async () => {
   if (selectedGradient.value.name !== GRADIENTS[0].name || !panelColRef.value || !previewColRef.value) return
   await nextTick()
-  panelColRef.value.style.height = previewColRef.value.offsetHeight + 'px'
+  if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+    panelColRef.value.style.height = previewColRef.value.offsetHeight + 'px'
+  }
 })
 
 // Format timestamp on client side only
@@ -182,6 +215,12 @@ function updateTimestamp() {
 async function fetchMessage() {
   if (!messageUrl.value) {
     setError('Please enter a Telegram message link')
+    return
+  }
+
+  // Pre-flight check: Detect private group/channel links (containing /c/)
+  if (messageUrl.value.includes('/c/')) {
+    triggerWarningToast()
     return
   }
 
@@ -229,6 +268,27 @@ async function fetchDemoMessage() {
 </script>
 
 <style scoped>
+/* Toast Animations & Styling */
+.toast-element {
+  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+  will-change: transform, opacity;
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.05),
+    0 10px 15px -3px rgba(0, 0, 0, 0.02),
+    0 20px 25px -5px rgba(0, 0, 0, 0.02),
+    0 0 0 1px rgba(0, 0, 0, 0.04) inset;
+}
+
+.toast-enter {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast-leave {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+
 .hero-title {
   font-size: clamp(1.75rem, 5vw, 3rem);
   line-height: 1.2;
