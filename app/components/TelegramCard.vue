@@ -10,7 +10,7 @@
     <!-- Card content -->
     <div class="relative z-10">
       <div
-        class="bg-white shadow-xl overflow-hidden w-[42rem] max-w-full rounded-2xl"
+        class="bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden w-[42rem] max-w-full rounded-2xl"
       >
         <div class="px-6 pt-6 pb-4">
           <!-- Author section -->

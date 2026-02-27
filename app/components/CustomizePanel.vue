@@ -1,19 +1,21 @@
 <template>
-  <div class="bg-white rounded-3xl border-2 border-slate-200 shadow-xl p-6">
-    <div class="flex items-center justify-between mb-6">
-      <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Customize</h3>
-    </div>
+  <div class="bg-white rounded-3xl border-2 border-slate-200 shadow-xl p-6 h-full flex flex-col justify-between">
+
+    <!-- Header -->
+    <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6">Customize</h3>
 
     <!-- Background selection -->
-    <div class="mb-6">
+    <div class="flex-1">
       <label class="block text-sm font-semibold text-slate-700 mb-3">Background</label>
-      <div class="grid grid-cols-4 gap-2">
+      <div class="grid grid-cols-4 gap-3">
         <button
           v-for="gradient in gradients"
           :key="gradient.name"
           @click="emit('update:gradient', gradient)"
-          class="h-12 rounded-xl transition-all ring-2 ring-offset-2 cursor-pointer"
-          :class="selectedGradient.name === gradient.name ? 'ring-blue-500 scale-105' : 'ring-transparent hover:ring-slate-300'"
+          class="h-14 rounded-2xl cursor-pointer ring-2 ring-offset-2 transition-all"
+          :class="selectedGradient.name === gradient.name
+            ? 'ring-blue-500'
+            : 'ring-transparent hover:ring-slate-300'"
           :style="{ background: gradient.preview }"
           :title="gradient.name"
         />
@@ -21,7 +23,7 @@
     </div>
 
     <!-- Hide post link toggle -->
-    <div class="mb-4">
+    <div class="mt-6">
       <div class="flex items-center justify-between mb-2">
         <label class="text-sm font-semibold text-slate-700">Hide Post Link</label>
         <button
@@ -43,6 +45,7 @@
         <p v-else key="shown" class="text-xs text-slate-500">Showing post link and timestamp</p>
       </Transition>
     </div>
+
   </div>
 </template>
 

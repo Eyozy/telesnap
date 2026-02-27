@@ -63,7 +63,7 @@
         <!-- Main Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start customization-grid">
           <!-- Preview Area -->
-          <div class="lg:col-span-2">
+          <div ref="previewColRef" class="lg:col-span-2">
             <!-- Preview Card -->
             <div v-if="messageData" class="flex justify-center">
               <TelegramCard
@@ -87,19 +87,10 @@
                 <p class="text-slate-500">Paste a Telegram link to see the preview</p>
               </div>
             </div>
-
-            <!-- Action Buttons -->
-            <div v-if="messageData" class="mt-6 md:mt-8">
-              <ActionButtons
-                :generating="generating"
-                :url="cardUrl"
-                @download="handleDownload"
-              />
-            </div>
           </div>
 
           <!-- Customization Panel -->
-          <div class="lg:col-span-1 customization-panel">
+          <div ref="panelColRef" class="lg:col-span-1 customization-panel">
             <CustomizePanel
               :gradients="GRADIENTS"
               :selected-gradient="selectedGradient"
@@ -109,15 +100,24 @@
             />
           </div>
         </div>
+
+        <!-- Action Buttons (outside grid, centered below both panels) -->
+        <div v-if="messageData" class="mt-6 md:mt-8">
+          <ActionButtons
+            :generating="generating"
+            :url="cardUrl"
+            @download="handleDownload"
+          />
+        </div>
       </div>
     </main>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick, watch } from 'vue'
 import type { MessageData, Gradient } from '~/types'
-import { DEFAULT_TELEGRAM_URL, DEMO_MESSAGE, GRADIENTS, DEFAULT_PADDING } from '~/constants'
+import { DEFAULT_TELEGRAM_URL, DEMO_MESSAGE, GRADIENTS } from '~/constants'
 import { useImageGenerator } from '~/composables/useImageGenerator'
 
 // Composables
@@ -149,6 +149,15 @@ const hidePostLink = ref(false)
 
 // Template ref
 const messageCard = ref<{ $el: HTMLElement } | null>(null)
+const previewColRef = ref<HTMLElement | null>(null)
+const panelColRef = ref<HTMLElement | null>(null)
+
+// Capture and lock the panel height once when data loads at default gradient
+watch(messageData, async () => {
+  if (selectedGradient.value.name !== GRADIENTS[0].name || !panelColRef.value || !previewColRef.value) return
+  await nextTick()
+  panelColRef.value.style.height = previewColRef.value.offsetHeight + 'px'
+})
 
 // Format timestamp on client side only
 onMounted(() => {
