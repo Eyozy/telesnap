@@ -9,31 +9,27 @@ interface TelegramMessage {
   content: string
   isoTimestamp: string | null
   views: number | null
-  media: string | null
+  media: string[]
+  mediaType?: 'photo' | 'video' | 'gif' | null
   forwardedFrom: {
     name: string
     url: string | null
   } | null
+  replyTo?: {
+    author: string
+    text: string
+  } | null
 }
 
-/** Telegram URL validation regex - supports both channel and group formats */
-// Channel: https://t.me/channel/123
-// Group:   https://t.me/c/1234567890/123
 const TELEGRAM_URL_REGEX = /^https?:\/\/(t\.me|telegram\.me)\/(c\/\d+|[a-zA-Z0-9_]+)\/(\d+)$/
-
-/** Allowed Telegram domains for SSRF protection */
 const ALLOWED_HOSTS = ['t.me', 'telegram.me']
 
-/** Request timeout in milliseconds */
-const FETCH_TIMEOUT_MS = 10_000
+const RESTRICTED_KEYWORDS = ['restricted', 'unavailable', 'blocked']
+const PROTECTED_KEYWORDS = ['forward', 'protected', 'disabled', 'copy']
 
-/** Image fetch timeout (shorter for non-critical assets) */
+const FETCH_TIMEOUT_MS = 10_000
 const IMAGE_FETCH_TIMEOUT_MS = 5_000
 
-/**
- * Converts an image URL to base64 data URL.
- * Returns null if fetch fails (non-blocking for main content).
- */
 async function imageToBase64(url: string): Promise<string | null> {
   if (!url) return null
 
@@ -55,41 +51,25 @@ async function imageToBase64(url: string): Promise<string | null> {
 
     return `data:${contentType};base64,${base64}`
   } catch {
-    // Silently fail - avatar is not critical
     return null
   }
 }
 
-/** Cache settings */
-const CACHE_MAX_AGE = 300 // 5 minutes
-const CACHE_STALE_MAX_AGE = 3600 // 1 hour stale-while-revalidate
+const CACHE_MAX_AGE = 300
+const CACHE_STALE_MAX_AGE = 3600
 
-/**
- * Validates that a URL is a legitimate Telegram URL.
- * Prevents SSRF attacks by strictly validating the hostname and protocol.
- */
 function validateTelegramUrl(url: string): boolean {
   try {
     const parsed = new URL(url)
-    // Only allow exact Telegram domains
-    if (!ALLOWED_HOSTS.includes(parsed.hostname)) {
-      return false
-    }
-    // Prevent protocol switching (must be HTTPS)
-    if (parsed.protocol !== 'https:') {
-      return false
-    }
+    if (!ALLOWED_HOSTS.includes(parsed.hostname)) return false
+    if (parsed.protocol !== 'https:') return false
     return true
   } catch {
     return false
   }
 }
 
-/**
- * API endpoint to fetch and parse Telegram post data.
- * Uses DOM parsing and server-side caching for security and performance.
- */
-export default defineCachedEventHandler(async (event) => {
+export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const { url } = body
 
@@ -100,7 +80,6 @@ export default defineCachedEventHandler(async (event) => {
     })
   }
 
-  // Validate URL format with regex
   const match = url.match(TELEGRAM_URL_REGEX)
   if (!match) {
     throw createError({
@@ -109,7 +88,6 @@ export default defineCachedEventHandler(async (event) => {
     })
   }
 
-  // Additional SSRF protection: validate the URL strictly
   if (!validateTelegramUrl(url)) {
     throw createError({
       statusCode: 400,
@@ -120,29 +98,32 @@ export default defineCachedEventHandler(async (event) => {
   const [, , channelName, messageId] = match
 
   try {
-    // First try static page (/s/) for channels
-    const staticUrl = `https://t.me/s/${channelName}/${messageId}`
-    let messageData = await fetchAndParse(staticUrl, channelName, messageId)
+    const embedUrl = `https://t.me/${channelName}/${messageId}?embed=1&mode=tme`
+    let messageData = await fetchAndParse(embedUrl, channelName, messageId, true)
 
-    // If no avatar found (group messages), try embed endpoint for user avatar
-    if (!messageData.avatar) {
-      const embedUrl = `https://t.me/${channelName}/${messageId}?embed=1&mode=tme`
-      const embedData = await fetchAndParse(embedUrl, channelName, messageId)
-      // Merge: prefer embed data for avatar and content if missing
-      messageData.avatar = embedData.avatar
-      if (!messageData.content) {
-        messageData.content = embedData.content
-      }
+    if (!messageData) {
+      const staticUrl = `https://t.me/s/${channelName}/${messageId}`
+      messageData = await fetchAndParse(staticUrl, channelName, messageId, false)
     }
 
-    // Convert avatar and media to base64 to avoid CORS issues and ensure they load simultaneously with text
-    const [avatarBase64, mediaBase64] = await Promise.all([
+    if (!messageData) {
+      throw createError({
+        statusCode: 404,
+        message: 'Message could not be extracted.'
+      })
+    }
+
+    const mediaPromises = messageData.media ? messageData.media.map(m => imageToBase64(m)) : []
+    const [avatarBase64, ...mediaBase64s] = await Promise.all([
       messageData.avatar ? imageToBase64(messageData.avatar) : Promise.resolve(null),
-      messageData.media ? imageToBase64(messageData.media) : Promise.resolve(null)
+      ...mediaPromises
     ])
 
     if (messageData.avatar) messageData.avatar = avatarBase64
-    if (messageData.media) messageData.media = mediaBase64
+    if (messageData.media && messageData.media.length > 0) {
+      const validMedia = mediaBase64s.filter(m => m !== null) as string[]
+      messageData.media = validMedia
+    }
 
     return messageData
 
@@ -157,20 +138,9 @@ export default defineCachedEventHandler(async (event) => {
       message: 'Failed to fetch message. Please try again later.'
     })
   }
-}, {
-  maxAge: CACHE_MAX_AGE,
-  staleMaxAge: CACHE_STALE_MAX_AGE,
-  swr: true,
-  getKey: async (event) => {
-    const body = await readBody(event)
-    return `telegram:${body?.url || 'unknown'}`
-  }
 })
 
-/**
- * Fetches and parses a Telegram page URL.
- */
-async function fetchAndParse(url: string, channelName: string, messageId: string): Promise<TelegramMessage> {
+async function fetchAndParse(url: string, channelName: string, messageId: string, isEmbed: boolean): Promise<TelegramMessage | null> {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
 
@@ -196,88 +166,119 @@ async function fetchAndParse(url: string, channelName: string, messageId: string
   }
 
   const html = await response.text()
-  return parseTelegramPage(html, channelName, messageId)
+  return parseTelegramPage(html, channelName, messageId, isEmbed)
 }
 
-/**
- * Parses Telegram HTML page using DOM parser.
- * More secure and maintainable than regex-based parsing.
- */
-function parseTelegramPage(html: string, channelName: string, messageId: string): TelegramMessage {
-  // linkedom returns a DOM-like document object
-  // Using 'any' here as linkedom lacks proper TypeScript types
+function parseTelegramPage(html: string, channelName: string, messageId: string, isEmbed: boolean): TelegramMessage | null {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { document } = parseHTML(html) as any
 
-  // Find the specific message block by data-post attribute
+  if (html.includes('Please open Telegram to view this post')) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'PROTECTED',
+      message: 'Content forwarding is disabled. Please open Telegram to view.'
+    })
+  }
+
   const messageBlock = document.querySelector(`[data-post="${channelName}/${messageId}"]`)
+
+  if (!isEmbed && !messageBlock) return null
+
   const searchScope = messageBlock || document
 
-  // Extract title from meta tag
+  const errorEl = searchScope.querySelector('.tgme_widget_message_error')
+  if (errorEl) {
+    const errText = errorEl.textContent?.toLowerCase() || ''
+
+    if (RESTRICTED_KEYWORDS.some(kw => errText.includes(kw))) {
+      throw createError({ statusCode: 403, statusMessage: 'RESTRICTED', message: 'Channel restricted by risk control.' })
+    }
+
+    if (PROTECTED_KEYWORDS.some(kw => errText.includes(kw))) {
+      throw createError({ statusCode: 403, statusMessage: 'PROTECTED', message: 'Content forwarding is disabled.' })
+    }
+
+    throw createError({ statusCode: 400, message: errorEl.textContent || 'Message cannot be loaded.' })
+  }
+
   const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content') || ''
   const title = decodeHtmlEntities(ogTitle) || channelName
-
-  // Parse author from title (format: "Author - Channel")
   const authorMatch = title.match(/^([^-]+)\s*-\s*.+$/)
   const author = authorMatch?.[1]?.trim() || title
 
-  // Extract message content
-  const contentEl = searchScope.querySelector('.tgme_widget_message_text')
+  const contentEl = searchScope.querySelector('.tgme_widget_message_text.js-message_text') || searchScope.querySelector('.tgme_widget_message_text')
+
+  if (contentEl) {
+    contentEl.querySelector('.tgme_widget_message_reply')?.remove()
+  }
+
   let content = contentEl?.innerHTML || ''
 
-  // Clean content: convert <br> to newlines, clean emoji tags, strip unwanted tags
   content = content
     .replace(/<br\s*\/?>/gi, '\n')
-    // Clean Telegram emoji <i> tags: extract emoji from nested <b> tag
-    // Format: <i class="emoji" style="..."><b>👍</b></i> -> 👍
     .replace(/<i[^>]*class="[^"]*emoji[^"]*"[^>]*>(?:<b>)?([^<]*)(?:<\/b>)?<\/i>/gi, '$1')
-    .replace(/<(?!\/?(?:a|b|i|strong|em|u|s|pre|code|span)\b)[^>]+>/gi, '')
+    .replace(/<(?!\/?(?:a|b|i|strong|em|u|s|pre|code|span|blockquote)\b)[^>]+>/gi, '')
     .trim()
   content = decodeHtmlEntities(content)
 
-  // Fallback to og:description for group messages (no static page available)
   if (!content) {
     const ogDescription = document.querySelector('meta[property="og:description"]')?.getAttribute('content') || ''
     content = decodeHtmlEntities(ogDescription)
   }
 
-  // Extract avatar - try multiple selectors for different page structures
-  // Static page: avatar is inside message block
-  // Embed page: avatar is a sibling of message bubble, use messageBlock directly
-  let avatar = messageBlock?.querySelector('.tgme_widget_message_user_photo img')?.getAttribute('src')
-    || searchScope.querySelector('.tgme_widget_message_user_photo img')?.getAttribute('src')
-    || null
+  let avatar = null
+  const avatarImg = messageBlock?.querySelector('.tgme_widget_message_user_photo img') || searchScope.querySelector('.tgme_widget_message_user_photo img')
 
-  // Extract post image from background-image style
-  const photoWrap = searchScope.querySelector('.tgme_widget_message_photo_wrap')
-  let postImage: string | null = null
-  if (photoWrap) {
-    const style = photoWrap.getAttribute('style') || ''
-    const bgMatch = style.match(/background-image:\s*url\('([^']+)'\)/)
-    postImage = bgMatch ? bgMatch[1] : null
+  if (avatarImg) {
+    avatar = avatarImg.getAttribute('src') || avatarImg.getAttribute('data-src') || null
   }
 
-  // Fallback to og:image if no post image found
-  // Removed because it often picks up the channel avatar for text-only posts
-  // if (!postImage) {
-  //   const ogImage = document.querySelector('meta[property="og:image"]')?.getAttribute('content')
-  //   // Only use og:image if it's not an avatar
-  //   if (ogImage && !ogImage.includes('userpic')) {
-  //     postImage = ogImage
-  //   }
-  // }
+  if (!avatar) {
+    const avatarIcon = messageBlock?.querySelector('i.tgme_widget_message_user_photo') || searchScope.querySelector('i.tgme_widget_message_user_photo')
+    if (avatarIcon) {
+      const bgMatch = (avatarIcon.getAttribute('style') || '').match(/background-image:\s*url\('([^']+)'\)/)
+      if (bgMatch) avatar = bgMatch[1]
+    }
+  }
 
-  // Extract timestamp from time element
+  let mediaArray: string[] = []
+  let mediaType: TelegramMessage['mediaType'] = null
+
+  const videoPlayer = searchScope.querySelector('.tgme_widget_message_video_player')
+  if (videoPlayer) {
+    if (videoPlayer.classList?.contains('js-message_gif') || searchScope.querySelector('.tgme_widget_message_document_icon_gif')) {
+      mediaType = 'gif'
+    } else {
+      mediaType = 'video'
+    }
+
+    const thumb = videoPlayer.querySelector('.tgme_widget_message_video_thumb')
+    if (thumb) {
+      const bgMatch = (thumb.getAttribute('style') || '').match(/background-image:\s*url\('([^']+)'\)/)
+      if (bgMatch) mediaArray.push(bgMatch[1])
+    }
+  }
+
+  if (mediaArray.length === 0) {
+    const photoWraps = searchScope.querySelectorAll('.tgme_widget_message_photo_wrap')
+    if (photoWraps && photoWraps.length > 0) {
+      mediaType = 'photo'
+      Array.from(photoWraps).forEach((wrap: any) => {
+        const bgMatch = (wrap.getAttribute('style') || '').match(/background-image:\s*url\('([^']+)'\)/)
+        if (bgMatch && !mediaArray.includes(bgMatch[1])) mediaArray.push(bgMatch[1])
+      })
+    }
+  }
+
   const timeLink = document.querySelector(`a[href*="/${channelName}/${messageId}"] time`)
   const isoTimestamp = timeLink?.getAttribute('datetime') || null
 
-  // Extract view count
   const viewsEl = searchScope.querySelector('.tgme_widget_message_views')
   let views: number | null = null
   if (viewsEl) {
     const viewsText = viewsEl.textContent || ''
     const cleanedViews = viewsText.replace(/[,\s]/g, '')
-    // Handle K/M suffixes
     if (cleanedViews.endsWith('K')) {
       views = parseFloat(cleanedViews) * 1000
     } else if (cleanedViews.endsWith('M')) {
@@ -287,16 +288,21 @@ function parseTelegramPage(html: string, channelName: string, messageId: string)
     }
   }
 
-  // Extract forwarded from info
   const forwardedEl = searchScope.querySelector('.tgme_widget_message_forwarded_from')
   let forwardedFrom: TelegramMessage['forwardedFrom'] = null
   if (forwardedEl) {
     const nameEl = forwardedEl.querySelector('.tgme_widget_message_forwarded_from_name')
     const name = nameEl?.textContent?.trim() || ''
     const url = nameEl?.getAttribute('href') || null
-    if (name) {
-      forwardedFrom = { name, url }
-    }
+    if (name) forwardedFrom = { name, url }
+  }
+
+  const replyEl = searchScope.querySelector('.tgme_widget_message_reply')
+  let replyTo = null
+  if (replyEl) {
+    const replyAuthor = replyEl.querySelector('.tgme_widget_message_author_name')?.textContent?.trim()
+    const replyText = replyEl.querySelector('.tgme_widget_message_text')?.textContent?.trim()
+    if (replyAuthor) replyTo = { author: replyAuthor, text: replyText || '' }
   }
 
   return {
@@ -306,12 +312,13 @@ function parseTelegramPage(html: string, channelName: string, messageId: string)
     content: content.trim(),
     isoTimestamp,
     views,
-    media: postImage,
-    forwardedFrom
+    media: mediaArray,
+    mediaType,
+    forwardedFrom,
+    replyTo
   }
 }
 
-/** Decode common HTML entities */
 function decodeHtmlEntities(text: string): string {
   const entities: Record<string, string> = {
     '&amp;': '&',
