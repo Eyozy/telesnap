@@ -1,7 +1,5 @@
-// Application constants - centralized configuration
 export const DEFAULT_TELEGRAM_URL = 'https://t.me/durov/32'
 
-// Demo message for initial preview
 export const DEMO_MESSAGE = {
     author: 'Pavel Durov',
     username: 'durov',
@@ -9,10 +7,9 @@ export const DEMO_MESSAGE = {
     content: "As some of you might have guessed, apart from jogging bathing and rowing we did some work this week. Lots of @telegram users asked for the possibility to have larger limits for groups and the ability appoint admins in groups. So we were working on it most of this week.\n\nNot me, obviously – I was mainly bathing and rowing (someone has to do the really hard stuff).",
     views: 1000000,
     isoTimestamp: '2015-10-30T13:34:00+00:00',
-    media: null
+    media: [] as string[]
 } as const
 
-// Background gradient options
 export const GRADIENTS = [
     { name: 'none', preview: 'transparent', style: 'transparent' },
     { name: 'blue', preview: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)', style: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)' },
@@ -24,20 +21,14 @@ export const GRADIENTS = [
     { name: 'telegram', preview: 'linear-gradient(135deg, #24A1DE 0%, #1a8bc2 100%)', style: 'linear-gradient(135deg, #24A1DE 0%, #1a8bc2 100%)' },
 ] as const
 
-// Default customization settings
 export const DEFAULT_PADDING = 32
 
-// Rate limiting configuration
 export const RATE_LIMIT = {
     MAX_REQUESTS: 30,
     WINDOW_MS: 60_000
 } as const
 
-// Telegram URL validation regex - supports both channel and group formats
-// Channel: https://t.me/channel/123
-// Group:   https://t.me/c/1234567890/123
 export const TELEGRAM_URL_REGEX = /^https?:\/\/(t\.me|telegram\.me)\/(c\/\d+|[a-zA-Z0-9_]+)\/(\d+)$/
 
-// DOMPurify allowed tags for XSS protection
-export const ALLOWED_HTML_TAGS = ['a', 'b', 'i', 'strong', 'em', 'u', 's', 'pre', 'code', 'br', 'span']
-export const ALLOWED_HTML_ATTRS = ['href', 'class', 'style', 'target', 'rel']
+export const ALLOWED_HTML_TAGS = ['a', 'b', 'i', 'strong', 'em', 'u', 's', 'pre', 'code', 'br', 'span', 'blockquote']
+export const ALLOWED_HTML_ATTRS = ['href', 'class', 'style', 'target', 'rel', 'expandable']

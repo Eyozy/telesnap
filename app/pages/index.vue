@@ -1,19 +1,17 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-slate-100 via-slate-50 to-blue-100">
     <!-- Toast Notification Overlay -->
-    <div class="fixed top-0 left-0 right-0 z-[999] flex flex-col items-center pt-8 px-4 pointer-events-none transition-all duration-300">
+    <div class="fixed top-0 left-0 right-0 z-[999] flex flex-col items-center pt-4 px-4 pointer-events-none transition-all duration-300">
       <div 
-        class="toast-element flex items-center gap-3 bg-white/95 backdrop-blur-md border border-slate-100 rounded-2xl py-3 px-4 w-full max-w-sm pointer-events-auto"
+        class="toast-wrapper flex flex-col items-center pointer-events-auto w-auto max-w-[90vw]"
         :class="showWarningToast ? 'toast-enter' : 'toast-leave'"
       >
-        <div class="flex-shrink-0 flex items-center justify-center text-amber-500 px-1">
-          <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-          </svg>
+        <div class="toast-tab flex items-center justify-center gap-1.5 font-semibold text-[13.5px] z-10" :class="activeToast.color">
+          <svg class="w-4 h-4 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" v-html="activeToast.icon"></svg>
+          <span class="text-slate-800">{{ activeToast.title }}</span>
         </div>
-        <div class="flex-1 min-w-0 flex flex-col justify-center text-left">
-          <p class="text-[14px] font-medium text-slate-800 leading-tight">Cannot read private link</p>
-          <p class="text-[12px] text-slate-500 mt-0.5 whitespace-normal break-words">Please use a public Telegram message link</p>
+        <div class="toast-body flex items-center justify-center shadow-sm z-0">
+          <div class="text-[14px] leading-snug text-slate-600 text-center font-medium">{{ activeToast.desc }}</div>
         </div>
       </div>
     </div>
@@ -76,7 +74,10 @@
             </button>
           </div>
           <p v-if="error" class="mt-2 text-sm text-red-500">{{ error }}</p>
-          <p class="mt-2 text-xs text-slate-500 text-center">Private groups and channels are not supported</p>
+          <div class="mt-2.5 flex items-center justify-center gap-1.5 text-xs text-slate-500 font-medium tracking-wide">
+            <span class="text-sm">💡</span>
+            <span>Telesnap supports public channel & group links only.</span>
+          </div>
         </div>
 
         <!-- Main Grid -->
@@ -121,7 +122,7 @@
         </div>
 
         <!-- Action Buttons (outside grid, centered below both panels) -->
-        <div v-if="messageData" class="mt-4 lg:mt-8">
+        <div v-if="messageData" class="mt-4 lg:mt-6 w-full flex justify-center">
           <ActionButtons
             :generating="generating"
             :url="cardUrl"
@@ -139,10 +140,8 @@ import type { MessageData, Gradient } from '~/types'
 import { DEFAULT_TELEGRAM_URL, DEMO_MESSAGE, GRADIENTS } from '~/constants'
 import { useImageGenerator } from '~/composables/useImageGenerator'
 
-// Composables
 const { generating, error: genError, downloadImage } = useImageGenerator()
 
-// State
 const messageUrl = ref('')
 const messageData = ref<MessageData | null>({ ...DEMO_MESSAGE })
 const loading = ref(false)
@@ -150,40 +149,58 @@ const error = ref('')
 const cardUrl = ref(DEFAULT_TELEGRAM_URL)
 let errorTimeout: ReturnType<typeof setTimeout> | null = null
 
-// Toast State
+// Toast Constants & State
+const TOAST_CONFIG = {
+  private: {
+    title: "Private Link Detected",
+    desc: "Private link detected. Try a public one.",
+    color: "text-red-500", 
+    icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>`
+  },
+  restricted: {
+    title: "Channel Restricted",
+    desc: "Channel restricted by risk control. Access denied.",
+    color: "text-amber-500", 
+    icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>`
+  },
+  protected: {
+    title: "Content Protected",
+    desc: "Forwarding disabled by author. Extraction blocked.",
+    color: "text-blue-500",
+    icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>`
+  }
+}
+
 const showWarningToast = ref(false)
+const activeToast = ref(TOAST_CONFIG.private)
 let toastTimeout: ReturnType<typeof setTimeout> | null = null
 
-function triggerWarningToast() {
+function triggerToast(type: keyof typeof TOAST_CONFIG) {
   if (toastTimeout) clearTimeout(toastTimeout)
+  activeToast.value = TOAST_CONFIG[type]
   showWarningToast.value = true
   toastTimeout = setTimeout(() => {
     showWarningToast.value = false
-  }, 3000)
+  }, 3500)
 }
 
-// Auto-clear error after 5 seconds
 function setError(message: string) {
   if (errorTimeout) clearTimeout(errorTimeout)
   error.value = message
   if (message) {
-    errorTimeout = setTimeout(() => {
-      error.value = ''
-    }, 5000)
+    errorTimeout = setTimeout(() => { error.value = '' }, 5000)
   }
 }
+
 const formattedTimestamp = ref('')
 
-// Customization state
 const selectedGradient = ref<Gradient>(GRADIENTS[0])
 const hidePostLink = ref(false)
 
-// Template ref
 const messageCard = ref<{ $el: HTMLElement } | null>(null)
 const previewColRef = ref<HTMLElement | null>(null)
 const panelColRef = ref<HTMLElement | null>(null)
 
-// Capture and lock the panel height once when data loads at default gradient
 let isPanelHeightLocked = false
 watch(messageData, async () => {
   if (selectedGradient.value.name !== GRADIENTS[0].name || !panelColRef.value || !previewColRef.value || isPanelHeightLocked) return
@@ -197,10 +214,8 @@ watch(messageData, async () => {
   }
 })
 
-// Format timestamp on client side only
 onMounted(() => {
   updateTimestamp()
-  // Fetch demo message with real avatar on mount
   fetchDemoMessage()
 })
 
@@ -223,9 +238,8 @@ async function fetchMessage() {
     return
   }
 
-  // Pre-flight check: Detect private group/channel links (containing /c/)
   if (messageUrl.value.includes('/c/')) {
-    triggerWarningToast()
+    triggerToast('private')
     return
   }
 
@@ -241,7 +255,15 @@ async function fetchMessage() {
     cardUrl.value = messageUrl.value
     updateTimestamp()
   } catch (err: unknown) {
-    const fetchError = err as { data?: { message?: string } }
+    const fetchError = err as { data?: { message?: string, statusMessage?: string, statusCode?: number } }
+    if (fetchError.data?.statusMessage === 'RESTRICTED') {
+      triggerToast('restricted')
+      return
+    }
+    if (fetchError.data?.statusMessage === 'PROTECTED') {
+      triggerToast('protected')
+      return
+    }
     setError(fetchError.data?.message || 'Failed to load message')
   } finally {
     loading.value = false
@@ -265,23 +287,18 @@ async function fetchDemoMessage() {
     messageData.value = response as MessageData
     cardUrl.value = DEFAULT_TELEGRAM_URL
     updateTimestamp()
-  } catch (err) {
-    // Silent fail - fallback to static DEMO_MESSAGE
-    console.log('Failed to fetch demo message, using fallback')
+  } catch {
+    // silent fail — fallback to static DEMO_MESSAGE
   }
 }
 </script>
 
 <style scoped>
 /* Toast Animations & Styling */
-.toast-element {
-  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+.toast-wrapper {
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: transform, opacity;
-  box-shadow: 
-    0 4px 6px -1px rgba(0, 0, 0, 0.05),
-    0 10px 15px -3px rgba(0, 0, 0, 0.02),
-    0 20px 25px -5px rgba(0, 0, 0, 0.02),
-    0 0 0 1px rgba(0, 0, 0, 0.04) inset;
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.08)) drop-shadow(0 4px 6px rgba(0, 0, 0, 0.03));
 }
 
 .toast-enter {
@@ -291,7 +308,41 @@ async function fetchDemoMessage() {
 
 .toast-leave {
   opacity: 0;
-  transform: translateY(-20px);
+  transform: translateY(-30px);
+}
+
+.toast-tab {
+  position: relative;
+  background: #ffffff;
+  border-radius: 12px 12px 0 0;
+  padding: 6px 16px 6px 16px;
+  --radius: 12px;
+}
+
+.toast-tab::before {
+  content: "";
+  position: absolute;
+  width: var(--radius);
+  height: var(--radius);
+  left: calc(-1 * var(--radius));
+  bottom: 0;
+  background: radial-gradient(circle at 0 0, transparent calc(var(--radius) - 0.5px), #ffffff calc(var(--radius)));
+}
+
+.toast-tab::after {
+  content: "";
+  position: absolute;
+  width: var(--radius);
+  height: var(--radius);
+  right: calc(-1 * var(--radius)); 
+  bottom: 0;
+  background: radial-gradient(circle at 100% 0, transparent calc(var(--radius) - 0.5px), #ffffff calc(var(--radius)));
+}
+
+.toast-body {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 8px 16px;
 }
 
 .hero-title {

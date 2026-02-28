@@ -48,14 +48,49 @@
             </div>
           </div>
 
-          <!-- Message content -->
+          <!-- Message content and Quotes -->
           <div>
+            <!-- Quoted Reply Component -->
+            <div v-if="message.replyTo" class="relative mb-2 pl-2.5 cursor-pointer max-w-full">
+              <div class="absolute left-0 top-0 bottom-0 w-[3px] bg-blue-500 rounded-sm"></div>
+              <div class="text-[14px] font-semibold text-blue-500 leading-tight mb-0.5 truncate">{{ message.replyTo.author }}</div>
+              <div class="text-[14px] text-slate-600 leading-snug truncate">{{ message.replyTo.text }}</div>
+            </div>
             <div 
               class="message-content whitespace-pre-wrap break-words leading-relaxed text-[15px] text-slate-800" 
               v-html="sanitizedContent"
             />
-            <div v-if="message.media" class="mt-4 rounded-xl overflow-hidden border border-slate-100">
-              <img :src="message.media" class="w-full h-auto object-cover" alt="post-media" loading="lazy" />
+            <div v-if="message.media && message.media.length > 0" class="mt-4 rounded-xl overflow-hidden border border-slate-100 relative media-grid" :class="'media-grid-' + Math.min(message.media.length, 4)">
+              <!-- Map through max 4 images -->
+              <template v-for="(img, idx) in message.media.slice(0, 4)" :key="idx">
+                <div class="relative w-full h-full" :class="{ 'item-0': message.media.length === 3 && idx === 0 }">
+                  <img :src="img" class="media-item" alt="post-media" loading="lazy" />
+                  
+                  <!-- Badges on the first image only -->
+                  <template v-if="idx === 0">
+                    <!-- Video Badge Overlay -->
+                    <div v-if="message.mediaType === 'video'" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div class="w-14 h-14 bg-black/40 rounded-full flex items-center justify-center backdrop-blur-sm shadow-sm">
+                        <svg class="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                      </div>
+                    </div>
+                    
+                    <!-- GIF Badge Overlay -->
+                    <div v-if="message.mediaType === 'gif'" class="absolute top-3 left-3 pointer-events-none">
+                      <div class="bg-black/40 text-white text-[11px] font-bold px-2 py-1 rounded backdrop-blur-sm tracking-wider uppercase shadow-sm">
+                        GIF
+                      </div>
+                    </div>
+                  </template>
+                  
+                  <!-- Overflow Cover for 4+ images (applied to the 4th item) -->
+                  <div v-if="idx === 3 && message.media.length > 4" class="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center pointer-events-none">
+                    <span class="text-white text-3xl font-bold tracking-tight">+{{ message.media.length - 3 }}</span>
+                  </div>
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -86,7 +121,6 @@ import DOMPurify from 'dompurify'
 import type { MessageData, Gradient } from '~/types'
 import { ALLOWED_HTML_TAGS, ALLOWED_HTML_ATTRS } from '~/constants'
 
-// Track avatar loading state
 const avatarFailed = ref(false)
 
 interface Props {
@@ -102,7 +136,6 @@ const props = withDefaults(defineProps<Props>(), {
   formattedTime: ''
 })
 
-// Reset avatar state when message changes
 watch(() => props.message.avatar, () => {
   avatarFailed.value = false
 })
@@ -115,65 +148,51 @@ const cardClasses = computed(() => ({
   'w-fit max-w-full': true
 }))
 
-/**
- * Converts plain URLs in text to clickable blue links.
- * Handles: http/https URLs, www. prefix, and bare domain names.
- */
 function linkifyUrls(text: string): string {
-  // Regex to match URLs: 
-  // - http:// or https:// URLs
-  // - www. prefixed URLs
-  // - domain.tld patterns (e.g., example.com, t.me/path)
-  const urlPattern = /(?<![\"'=])(?:https?:\/\/[^\s<>]+|www\.[^\s<>]+|(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+(?:com|org|net|io|me|co|dev|app|ai|xyz|info|biz|tv|cc|ru|cn|uk|de|fr|jp|kr|in|br|au|ca|nl|it|es|ch|se|no|fi|dk|pl|cz|at|be|pt|gr|tr|ua|il|sa|ae|sg|hk|tw|nz|za|mx|ar|cl|pe|co\.uk|com\.br|co\.jp|com\.au|co\.nz|co\.za)(?:\/[^\s<>]*)?)/gi
-  
+  const urlPattern = /(?<!["'=])(?:https?:\/\/[^\s<>]+|www\.[^\s<>]+|(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+(?:com|org|net|io|me|co|dev|app|ai|xyz|info|biz|tv|cc|ru|cn|uk|de|fr|jp|kr|in|br|au|ca|nl|it|es|ch|se|no|fi|dk|pl|cz|at|be|pt|gr|tr|ua|il|sa|ae|sg|hk|tw|nz|za|mx|ar|cl|pe|co\.uk|com\.br|co\.jp|com\.au|co\.nz|co\.za)(?:\/[^\s<>]*)?)/gi
   return text.replace(urlPattern, (url) => {
-    // Skip if already inside an anchor tag (check for preceding href=")
     const href = url.startsWith('http') ? url : `https://${url}`
-    // Use inline styles for image export compatibility (CSS classes don't work in snapdom)
     return `<a href="${href}" style="color: #2563eb; text-decoration: none;" target="_blank" rel="noopener">${url}</a>`
   })
 }
 
 const sanitizedContent = computed(() => {
   if (!props.message?.content) return ''
-  
-  // DOMPurify only works in browser, skip sanitization during SSR
-  // The component will re-render on client with proper sanitization
-  if (!import.meta.client) {
-    return props.message.content
-  }
-  
-  // First sanitize the HTML
+  if (!import.meta.client) return props.message.content
+
   let content = DOMPurify.sanitize(props.message.content, {
     ALLOWED_TAGS: ALLOWED_HTML_TAGS,
     ALLOWED_ATTR: ALLOWED_HTML_ATTRS
   })
-  
-  // Add inline styles to existing anchor tags for image export compatibility
+
   content = content.replace(/<a\s+([^>]*?)>/gi, (match, attrs) => {
-    // If style attribute already exists, append to it; otherwise add it
     if (attrs.includes('style=')) {
       return match.replace(/style="([^"]*)"/i, 'style="$1; color: #2563eb; text-decoration: none;"')
     }
     return `<a ${attrs} style="color: #2563eb; text-decoration: none;">`
   })
-  
-  // Then linkify URLs that aren't already wrapped in anchor tags
-  // Split by existing anchor tags to avoid double-wrapping
+
+  const textParts = content.split(/(<[^>]*>)/)
+  for (let i = 0; i < textParts.length; i++) {
+    const part = textParts[i]
+    if (i % 2 === 0 && part) {
+      let newText = part.replace(/(^|[\s(（【'"])(#[^\s#<.,!?;:()（）【】'"]+)/g, '$1<span style="color: #2563eb;">$2</span>')
+      newText = newText.replace(/([^\s])(#[^\s#<.,!?;:()（）【】'"]+)/g, '$1<span style="color: #2563eb;">$2</span>')
+      newText = newText.replace(/<span style="color: #2563eb;"><span style="color: #2563eb;">/g, '<span style="color: #2563eb;">').replace(/<\/span><\/span>/g, '</span>')
+      textParts[i] = newText
+    }
+  }
+  content = textParts.join('')
+
   const parts = content.split(/(<a[^>]*>.*?<\/a>)/gi)
   content = parts.map(part => {
-    // If it's an anchor tag, leave it alone (already styled above)
-    if (part.match(/^<a[^>]*>/i)) {
-      return part
-    }
-    // Otherwise, linkify URLs in this part
+    if (part.match(/^<a[^>]*>/i)) return part
     return linkifyUrls(part)
   }).join('')
-  
+
   return content
 })
 
-// Expose $el for parent components to access root element
 defineExpose({})
 </script>
 
@@ -182,9 +201,48 @@ defineExpose({})
   transition: all 0.3s ease;
 }
 
+/* Message formatting */
 .message-content a {
   color: #2563eb;
   text-decoration: none;
+}
+
+.message-content :deep(blockquote) {
+  border-left: 3px solid #cbd5e1; /* slate-300 */
+  padding-left: 10px;
+  margin-top: 6px;
+  margin-bottom: 6px;
+  font-style: normal;
+}
+
+/* Media Grid System */
+.media-grid {
+  display: grid;
+  gap: 4px; /* Hard separation lines */
+}
+.media-grid-1 {
+  grid-template-columns: 1fr;
+}
+.media-grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+  height: 240px;
+}
+.media-grid-3 {
+  grid-template-columns: repeat(2, 1fr); /* 50/50 split exactly */
+  grid-template-rows: repeat(2, 140px);
+}
+.media-grid-3 .item-0 {
+  grid-row: span 2;
+  height: 100%;
+}
+.media-grid-4 {
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 160px);
+}
+.media-item {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .slide-fade-enter-active {

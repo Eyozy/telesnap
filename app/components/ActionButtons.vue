@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col sm:flex-row justify-center gap-3">
+  <div class="flex flex-row items-center justify-center gap-3">
     <!-- Download button -->
     <button
       @click="emit('download')"
@@ -69,11 +69,9 @@ const handleCopy = async () => {
   try {
     await navigator.clipboard.writeText(props.url)
     copied.value = true
-    setTimeout(() => {
-      copied.value = false
-    }, 2000)
-  } catch (err) {
-    console.error('Failed to copy to clipboard:', err)
+    setTimeout(() => { copied.value = false }, 2000)
+  } catch {
+    // clipboard access denied — no-op
   }
 }
 </script>

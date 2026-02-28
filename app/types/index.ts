@@ -1,6 +1,3 @@
-// Centralized type definitions for the application
-
-/** Telegram message data structure */
 export interface MessageData {
     author: string
     username: string
@@ -8,28 +5,30 @@ export interface MessageData {
     content: string
     views: number | null
     isoTimestamp: string | null
-    media?: string | null
+    media?: string[]
+    mediaType?: 'photo' | 'video' | 'gif' | null
     forwardedFrom?: {
         name: string
         url: string | null
     } | null
+    replyTo?: {
+        author: string
+        text: string
+    } | null
 }
 
-/** Background gradient option */
 export interface Gradient {
     name: string
     preview: string
     style: string
 }
 
-/** API response wrapper */
 export interface ApiResponse<T> {
     success: boolean
     data?: T
     message?: string
 }
 
-/** Parsed Telegram URL parts */
 export interface TelegramUrlParts {
     channel: string
     messageId: string
