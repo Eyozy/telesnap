@@ -15,17 +15,11 @@ interface TelegramMessage {
     name: string
     url: string | null
   } | null
-  replyTo?: {
-    author: string
-    text: string
-  } | null
+  replyTo?: { author: string; text: string } | null
 }
 
 const TELEGRAM_URL_REGEX = /^https?:\/\/(t\.me|telegram\.me)\/(c\/\d+|[a-zA-Z0-9_]+)\/(\d+)$/
 const ALLOWED_HOSTS = ['t.me', 'telegram.me']
-
-const RESTRICTED_KEYWORDS = ['restricted', 'unavailable', 'blocked']
-const PROTECTED_KEYWORDS = ['forward', 'protected', 'disabled', 'copy']
 
 const FETCH_TIMEOUT_MS = 10_000
 const IMAGE_FETCH_TIMEOUT_MS = 5_000
@@ -173,14 +167,6 @@ function parseTelegramPage(html: string, channelName: string, messageId: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { document } = parseHTML(html) as any
 
-  if (html.includes('Please open Telegram to view this post')) {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'PROTECTED',
-      message: 'Content forwarding is disabled. Please open Telegram to view.'
-    })
-  }
-
   const messageBlock = document.querySelector(`[data-post="${channelName}/${messageId}"]`)
 
   if (!isEmbed && !messageBlock) return null
@@ -189,17 +175,10 @@ function parseTelegramPage(html: string, channelName: string, messageId: string,
 
   const errorEl = searchScope.querySelector('.tgme_widget_message_error')
   if (errorEl) {
-    const errText = errorEl.textContent?.toLowerCase() || ''
-
-    if (RESTRICTED_KEYWORDS.some(kw => errText.includes(kw))) {
-      throw createError({ statusCode: 403, statusMessage: 'RESTRICTED', message: 'Channel restricted by risk control.' })
-    }
-
-    if (PROTECTED_KEYWORDS.some(kw => errText.includes(kw))) {
-      throw createError({ statusCode: 403, statusMessage: 'PROTECTED', message: 'Content forwarding is disabled.' })
-    }
-
-    throw createError({ statusCode: 400, message: errorEl.textContent || 'Message cannot be loaded.' })
+    throw createError({
+      statusCode: 400,
+      message: errorEl.textContent || 'Access denied by Telegram.'
+    })
   }
 
   const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content') || ''

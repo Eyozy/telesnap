@@ -87,7 +87,7 @@
                   
                   <!-- Overflow Cover for 4+ images (applied to the 4th item) -->
                   <div v-if="idx === 3 && message.media.length > 4" class="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center pointer-events-none">
-                    <span class="text-white text-3xl font-bold tracking-tight">+{{ message.media.length - 3 }}</span>
+                    <span class="text-white text-3xl font-bold tracking-tight">+{{ message.media.length - 4 }}</span>
                   </div>
                 </div>
               </template>
@@ -218,26 +218,52 @@ defineExpose({})
 /* Media Grid System */
 .media-grid {
   display: grid;
-  gap: 4px; /* Hard separation lines */
+  gap: 4px;
+  border-radius: 0.75rem;
+  overflow: hidden;
 }
+
+/* 1 Image: Display single column. Keep original ratio. */
 .media-grid-1 {
   grid-template-columns: 1fr;
 }
-.media-grid-2 {
-  grid-template-columns: repeat(2, 1fr);
-  height: 240px;
+.media-grid-1 .media-item {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
 }
+
+/* 2 Images: 2 columns, equal width */
+.media-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.media-grid-2 .media-item {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+}
+
+/* 3 Images: 1 large left, 2 stacked right */
 .media-grid-3 {
-  grid-template-columns: repeat(2, 1fr); /* 50/50 split exactly */
-  grid-template-rows: repeat(2, 140px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  aspect-ratio: 16 / 9;
 }
 .media-grid-3 .item-0 {
   grid-row: span 2;
   height: 100%;
 }
+.media-grid-3 .media-item {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 4 Images: 2x2 grid */
 .media-grid-4 {
-  grid-template-columns: repeat(2, 1fr);
-  grid-template-rows: repeat(2, 160px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  aspect-ratio: 3 / 2;
 }
 .media-item {
   width: 100%;

@@ -2,7 +2,7 @@
   <div class="flex flex-row items-center justify-center gap-3">
     <!-- Download button -->
     <button
-      @click="emit('download')"
+      @click="$emit('download')"
       :disabled="generating"
       class="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-medium py-2.5 sm:py-3 px-5 sm:px-8 rounded-xl transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/40 cursor-pointer text-sm sm:text-base min-w-[140px]"
     >

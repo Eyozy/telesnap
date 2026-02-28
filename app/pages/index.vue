@@ -73,7 +73,6 @@
               </Transition>
             </button>
           </div>
-          <p v-if="error" class="mt-2 text-sm text-red-500">{{ error }}</p>
           <div class="mt-2.5 flex items-center justify-center gap-1.5 text-xs text-slate-500 font-medium tracking-wide">
             <span class="text-sm">💡</span>
             <span>Telesnap supports public channel & group links only.</span>
@@ -86,14 +85,15 @@
           <div ref="previewColRef" class="lg:col-span-2">
             <!-- Preview Card -->
             <div v-if="messageData" class="flex justify-center">
-              <TelegramCard
-                ref="messageCard"
-                :message="messageData"
-                :url="cardUrl"
-                :gradient="selectedGradient"
-                :hide-link="hidePostLink"
-                :formatted-time="formattedTimestamp"
-              />
+              <div ref="messageCardWrap" class="max-w-full">
+                <TelegramCard
+                  :message="messageData"
+                  :url="cardUrl"
+                  :gradient="selectedGradient"
+                  :hide-link="hidePostLink"
+                  :formatted-time="formattedTimestamp"
+                />
+              </div>
             </div>
 
             <!-- Empty State -->
@@ -149,47 +149,27 @@ const error = ref('')
 const cardUrl = ref(DEFAULT_TELEGRAM_URL)
 let errorTimeout: ReturnType<typeof setTimeout> | null = null
 
-// Toast Constants & State
-const TOAST_CONFIG = {
-  private: {
-    title: "Private Link Detected",
-    desc: "Private link detected. Try a public one.",
-    color: "text-red-500", 
-    icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>`
-  },
-  restricted: {
-    title: "Channel Restricted",
-    desc: "Channel restricted by risk control. Access denied.",
-    color: "text-amber-500", 
-    icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>`
-  },
-  protected: {
-    title: "Content Protected",
-    desc: "Forwarding disabled by author. Extraction blocked.",
-    color: "text-blue-500",
-    icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>`
-  }
-}
-
+// Toast State
 const showWarningToast = ref(false)
-const activeToast = ref(TOAST_CONFIG.private)
+const activeToast = ref({ title: '', desc: '', color: 'text-red-500', icon: '' })
 let toastTimeout: ReturnType<typeof setTimeout> | null = null
 
-function triggerToast(type: keyof typeof TOAST_CONFIG) {
+function showToast(title: string, desc: string, type: 'error' | 'warning' = 'error') {
   if (toastTimeout) clearTimeout(toastTimeout)
-  activeToast.value = TOAST_CONFIG[type]
+  activeToast.value = {
+    title,
+    desc,
+    color: type === 'error' ? 'text-red-500' : 'text-amber-500',
+    icon: type === 'error'
+      ? `<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>`
+      : `<path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>`
+  }
   showWarningToast.value = true
-  toastTimeout = setTimeout(() => {
-    showWarningToast.value = false
-  }, 3500)
+  toastTimeout = setTimeout(() => { showWarningToast.value = false }, 4000)
 }
 
 function setError(message: string) {
-  if (errorTimeout) clearTimeout(errorTimeout)
-  error.value = message
-  if (message) {
-    errorTimeout = setTimeout(() => { error.value = '' }, 5000)
-  }
+  if (message) showToast('Extraction Failed', message, 'error')
 }
 
 const formattedTimestamp = ref('')
@@ -197,7 +177,7 @@ const formattedTimestamp = ref('')
 const selectedGradient = ref<Gradient>(GRADIENTS[0])
 const hidePostLink = ref(false)
 
-const messageCard = ref<{ $el: HTMLElement } | null>(null)
+const messageCardWrap = ref<HTMLElement | null>(null)
 const previewColRef = ref<HTMLElement | null>(null)
 const panelColRef = ref<HTMLElement | null>(null)
 
@@ -234,12 +214,12 @@ function updateTimestamp() {
 
 async function fetchMessage() {
   if (!messageUrl.value) {
-    setError('Please enter a Telegram message link')
+    showToast('Invalid Input', 'Please enter a Telegram message link', 'warning')
     return
   }
 
   if (messageUrl.value.includes('/c/')) {
-    triggerToast('private')
+    showToast('Private Link', 'Private link detected. Try a public one.', 'error')
     return
   }
 
@@ -255,26 +235,19 @@ async function fetchMessage() {
     cardUrl.value = messageUrl.value
     updateTimestamp()
   } catch (err: unknown) {
-    const fetchError = err as { data?: { message?: string, statusMessage?: string, statusCode?: number } }
-    if (fetchError.data?.statusMessage === 'RESTRICTED') {
-      triggerToast('restricted')
-      return
-    }
-    if (fetchError.data?.statusMessage === 'PROTECTED') {
-      triggerToast('protected')
-      return
-    }
-    setError(fetchError.data?.message || 'Failed to load message')
+    const fetchError = err as { data?: { message?: string } }
+    const errorMsg = fetchError.data?.message || 'Failed to load message'
+    showToast('Content Unavailable', errorMsg, 'error')
   } finally {
     loading.value = false
   }
 }
 
 async function handleDownload() {
-  const element = messageCard.value?.$el || messageCard.value
+  const element = messageCardWrap.value
   await downloadImage(element as HTMLElement)
   if (genError.value) {
-    setError(genError.value)
+    showToast('Download Failed', genError.value, 'error')
   }
 }
 
