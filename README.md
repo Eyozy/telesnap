@@ -9,7 +9,10 @@ Turn Telegram Messages into Beautiful, Shareable Images.
 - 📐 **Custom Spacing** - Flexibly adjust padding around the card
 - 🔒 **Hide Link** - Option to hide post link, show timestamp only
 - 📥 **HD Export** - 4x scale for crisp, sharp images
-- 📋 **One-Click Copy** - Quickly copy link to clipboard
+- 📋 **Copy Source Link** - One-click copy of the original Telegram link
+- 🖼️ **Multi-Media Support** - Renders photo albums, video thumbnails, and GIF badges
+- 💬 **Reply & Forward** - Displays quoted replies and forwarded-from attribution
+- ⚠️ **Smart Error Toasts** - Distinct notifications for private, restricted, and content-protected links
 - 🛡️ **Secure & Reliable** - XSS protection, SSRF protection, rate limiting
 
 ## 🚀 Quick Start
@@ -69,7 +72,7 @@ telesnap/
 │   └── types/              # TypeScript type definitions
 ├── server/
 │   ├── api/                # API endpoints
-│   │   └── fetch-post.ts   # Fetch Telegram post
+│   │   └── fetch-post.ts   # Fetch, parse & sanitize Telegram posts (media, reply, forwarded)
 │   └── middleware/         # Server middleware
 │       └── rate-limit.ts   # Rate limiting
 ├── public/                 # Static assets
