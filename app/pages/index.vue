@@ -184,11 +184,16 @@ const previewColRef = ref<HTMLElement | null>(null)
 const panelColRef = ref<HTMLElement | null>(null)
 
 // Capture and lock the panel height once when data loads at default gradient
+let isPanelHeightLocked = false
 watch(messageData, async () => {
-  if (selectedGradient.value.name !== GRADIENTS[0].name || !panelColRef.value || !previewColRef.value) return
+  if (selectedGradient.value.name !== GRADIENTS[0].name || !panelColRef.value || !previewColRef.value || isPanelHeightLocked) return
   await nextTick()
   if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
-    panelColRef.value.style.height = previewColRef.value.offsetHeight + 'px'
+    const height = previewColRef.value.offsetHeight
+    if (height > 0) {
+      panelColRef.value.style.height = height + 'px'
+      isPanelHeightLocked = true
+    }
   }
 })
 

@@ -135,10 +135,14 @@ export default defineCachedEventHandler(async (event) => {
       }
     }
 
-    // Convert avatar to base64 to avoid CORS issues during image export
-    if (messageData.avatar) {
-      messageData.avatar = await imageToBase64(messageData.avatar)
-    }
+    // Convert avatar and media to base64 to avoid CORS issues and ensure they load simultaneously with text
+    const [avatarBase64, mediaBase64] = await Promise.all([
+      messageData.avatar ? imageToBase64(messageData.avatar) : Promise.resolve(null),
+      messageData.media ? imageToBase64(messageData.media) : Promise.resolve(null)
+    ])
+
+    if (messageData.avatar) messageData.avatar = avatarBase64
+    if (messageData.media) messageData.media = mediaBase64
 
     return messageData
 

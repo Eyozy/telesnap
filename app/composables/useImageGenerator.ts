@@ -61,7 +61,7 @@ export function useImageGenerator() {
             const result = await snapdom(clone)
             await result.download({
                 filename: `${filename}-${Date.now()}.png`,
-                scale: 4
+                scale: 2
             })
         } catch (err: unknown) {
             console.error('Failed to generate image:', err)
