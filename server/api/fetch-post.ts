@@ -181,10 +181,24 @@ function parseTelegramPage(html: string, channelName: string, messageId: string,
     })
   }
 
-  const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content') || ''
-  const title = decodeHtmlEntities(ogTitle) || channelName
-  const authorMatch = title.match(/^([^-]+)\s*-\s*.+$/)
-  const author = authorMatch?.[1]?.trim() || title
+  const authorNameEl = searchScope.querySelector('.tgme_widget_message_author_name') || searchScope.querySelector('.tgme_widget_message_owner_name')
+  let author = authorNameEl?.textContent?.trim() || ''
+
+  if (!author) {
+    const ogSiteName = document.querySelector('meta[property="og:site_name"]')?.getAttribute('content') || ''
+    author = decodeHtmlEntities(ogSiteName)
+  }
+
+  if (!author) {
+    const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content') || ''
+    const title = decodeHtmlEntities(ogTitle) || channelName
+    const authorMatch = title.match(/^([^-]+)\s*-\s*.+$/)
+    author = authorMatch?.[1]?.trim() || title
+  }
+
+  if (!author) {
+    author = channelName
+  }
 
   const contentEl = searchScope.querySelector('.tgme_widget_message_text.js-message_text') || searchScope.querySelector('.tgme_widget_message_text')
 
