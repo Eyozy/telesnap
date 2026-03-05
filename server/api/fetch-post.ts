@@ -175,9 +175,20 @@ function parseTelegramPage(html: string, channelName: string, messageId: string,
 
   const errorEl = searchScope.querySelector('.tgme_widget_message_error')
   if (errorEl) {
+    const errorText = errorEl.textContent || 'Access denied by Telegram.'
+    const errorLower = errorText.toLowerCase()
+
+    // Check if error is related to content protection
+    if (errorLower.includes('protected') || errorLower.includes('restricted') || errorLower.includes('forwarding')) {
+      throw createError({
+        statusCode: 403,
+        message: 'This channel has content protection enabled. Cannot extract message content.'
+      })
+    }
+
     throw createError({
       statusCode: 400,
-      message: errorEl.textContent || 'Access denied by Telegram.'
+      message: errorText
     })
   }
 
@@ -200,6 +211,22 @@ function parseTelegramPage(html: string, channelName: string, messageId: string,
     author = channelName
   }
 
+  const messageWidget = searchScope.querySelector('.tgme_widget_message')
+
+  // Multi-layer content protection detection
+  const protectionClasses = ['noforwards', 'no-forwards', 'protected', 'restricted', 'tgme_protected']
+  const hasProtectionClass = protectionClasses.some(cls => messageWidget?.classList?.contains(cls))
+
+  const hasProtectionAttr = messageWidget?.hasAttribute('data-protected') ||
+                            messageWidget?.hasAttribute('data-noforwards')
+
+  if (hasProtectionClass || hasProtectionAttr) {
+    throw createError({
+      statusCode: 403,
+      message: 'This channel has content protection enabled. Cannot extract message content.'
+    })
+  }
+
   const contentEl = searchScope.querySelector('.tgme_widget_message_text.js-message_text') || searchScope.querySelector('.tgme_widget_message_text')
 
   if (contentEl) {
@@ -218,6 +245,35 @@ function parseTelegramPage(html: string, channelName: string, messageId: string,
   if (!content) {
     const ogDescription = document.querySelector('meta[property="og:description"]')?.getAttribute('content') || ''
     content = decodeHtmlEntities(ogDescription)
+  }
+
+  // Validate content authenticity - detect placeholder/protected content indicators
+  const protectedIndicators = [
+    'this message is protected',
+    'content not available',
+    'restricted content',
+    'protected content',
+    '此消息受保护',
+    '内容不可用',
+    '受限内容'
+  ]
+  const contentLower = content.toLowerCase().trim()
+  const isPlaceholder = protectedIndicators.some(indicator => contentLower.includes(indicator)) ||
+                        (content.trim().length > 0 && content.trim().length < 5 && /^[.*\-_]+$/.test(content.trim()))
+
+  if (isPlaceholder) {
+    throw createError({
+      statusCode: 403,
+      message: 'This content appears to be protected or unavailable.'
+    })
+  }
+
+  const hasMedia = searchScope.querySelector('.tgme_widget_message_video_player') || searchScope.querySelector('.tgme_widget_message_photo_wrap')
+  if (!content && !hasMedia) {
+    throw createError({
+      statusCode: 404,
+      message: 'Message appears to be empty or protected. Cannot generate image.'
+    })
   }
 
   let avatar = null
